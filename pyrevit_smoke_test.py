@@ -5,14 +5,14 @@ pyRevit smoke-test harness for batch_dwg_to_rvt.py
 
 Runs the batch_dwg_to_rvt pipeline one stage at a time against a SINGLE
 sample DWG, instead of the full 60-file batch loop - use this to iterate on
-extract_stand_geometry / create_walls_for_stand / place_rooms_in_enclosed_areas
-without waiting on the whole pipeline (or Dynamo) each time.
+create_doc_from_template / import_or_link_dwg without waiting on the whole
+pipeline (or Dynamo) each time.
 
 Usage (inside Revit, with pyRevit installed):
     1. Edit TEST_TEMPLATE_PATH and TEST_DWG_PATH below.
     2. Open a project in Revit, then run this file as a pyRevit button, or
        paste its contents into pyRevit's Python console.
-    3. Read the printed PASS/FAIL/SKIP report - fix the failing stage, rerun.
+    3. Read the printed PASS/FAIL report - fix the failing stage, rerun.
 
 The test document is left open (not saved/closed) so you can inspect the
 result in the Revit UI - close it yourself between runs.
@@ -42,9 +42,6 @@ def report(name, fn, *args):
         result = fn(*args)
         print("PASS: {}".format(name))
         return True, result
-    except NotImplementedError:
-        print("SKIP (not implemented yet): {}".format(name))
-        return None, None
     except Exception:
         print("FAIL: {}".format(name))
         print(traceback.format_exc())
@@ -58,46 +55,12 @@ def main():
     if not ok:
         return
 
-    ok, cad_id = report(
+    ok, _ = report(
         "import_or_link_dwg", b.import_or_link_dwg, doc, TEST_DWG_PATH, b.IMPORT_MODE
     )
     if not ok:
         doc.Close(False)
         return
-
-    ok, stands = report(
-        "extract_stand_geometry",
-        b.extract_stand_geometry,
-        doc,
-        cad_id,
-        b.STAND_OUTLINE_LAYER,
-        b.STAND_ID_LAYER,
-    )
-    if ok:
-        print("Found {} stand(s)".format(len(stands)))
-
-        # TODO: resolve these the same way process_single_dwg will need to.
-        wall_type_id = None
-        level_id = None
-        level = None
-
-        t = b.Transaction(doc, "Smoke test: walls + rooms")
-        t.Start()
-        try:
-            for stand in stands:
-                report(
-                    "create_walls_for_stand",
-                    b.create_walls_for_stand,
-                    doc,
-                    stand["boundary_curves"],
-                    wall_type_id,
-                    level_id,
-                )
-            report("place_rooms_in_enclosed_areas", b.place_rooms_in_enclosed_areas, doc, level, stands)
-            t.Commit()
-        except Exception:
-            t.RollBack()
-            raise
 
     print("Done - doc left open for inspection, close it manually when finished.")
 
