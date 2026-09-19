@@ -3,8 +3,7 @@
 Batch DWG -> RVT stand conversion.
 
 For each DWG in DWG_FOLDER: new doc from TEMPLATE_PATH -> import/link the DWG
--> create walls + rooms from stand outlines [stubs below] -> save to
-OUTPUT_FOLDER, close.
+-> save to OUTPUT_FOLDER, close.
 
 Runs as a Dynamo Python node, or standalone via pyRevit/RevitPythonShell.
 
@@ -39,8 +38,6 @@ TEMPLATE_PATH = r"C:\Path\To\Your\StandardTemplate.rte"
 DWG_FOLDER = r"C:\Path\To\Your\DWGs"
 OUTPUT_FOLDER = r"C:\Path\To\Your\Output"
 IMPORT_MODE = "link"  # "import" | "link"
-STAND_OUTLINE_LAYER = "Expo_Stand_Outline"
-STAND_ID_LAYER = "Expo_Stand_ID"
 
 
 def get_dwg_files(folder):
@@ -80,55 +77,12 @@ def import_or_link_dwg(doc, dwg_path, mode):
         raise
 
 
-def extract_stand_geometry(doc, cad_element_id, outline_layer, id_layer):
-    """STUB: return [{"boundary_curves": [Curve, ...], "centroid": XYZ, "stand_id_text": str|None}, ...]."""
-    raise NotImplementedError
-
-
-def create_walls_for_stand(doc, boundary_curves, wall_type_id, level_id):
-    """STUB: Wall.Create(doc, curve, wall_type_id, level_id, ...) per boundary curve. Call inside an open Transaction."""
-    raise NotImplementedError
-
-
-def place_rooms_in_enclosed_areas(doc, level, stands):
-    """Put a Room in every wall-enclosed area on level (like Room > Place Rooms
-    Automatically), then name each from the nearest stand's stand_id_text.
-    Call inside an open Transaction.
-    """
-    rooms = [doc.Create.NewRoom(level, circuit) for circuit in doc.get_PlanTopology(level).Circuits]
-
-    for room in rooms:
-        point = room.Location.Point
-        nearest = min(stands, key=lambda s: point.DistanceTo(s["centroid"])) if stands else None
-        if nearest and nearest["stand_id_text"]:
-            room.Name = nearest["stand_id_text"]
-
-    return rooms
-
-
 def process_single_dwg(app, dwg_path, output_folder):
     """One DWG -> one RVT. Returns (success, message)."""
     doc = None
     try:
         doc = create_doc_from_template(app, TEMPLATE_PATH)
-        cad_id = import_or_link_dwg(doc, dwg_path, IMPORT_MODE)
-
-        wall_type_id = None   # TODO: resolve from template
-        level_id = None       # TODO: resolve from template
-        level = None          # TODO: resolve from template
-
-        stands = extract_stand_geometry(doc, cad_id, STAND_OUTLINE_LAYER, STAND_ID_LAYER)
-
-        t = Transaction(doc, "Create walls and rooms")
-        t.Start()
-        try:
-            for stand in stands:
-                create_walls_for_stand(doc, stand["boundary_curves"], wall_type_id, level_id)
-            place_rooms_in_enclosed_areas(doc, level, stands)
-            t.Commit()
-        except Exception:
-            t.RollBack()
-            raise
+        import_or_link_dwg(doc, dwg_path, IMPORT_MODE)
 
         out_path = os.path.join(output_folder, os.path.splitext(os.path.basename(dwg_path))[0] + ".rvt")
         save_options = SaveAsOptions()
